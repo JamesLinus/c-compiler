@@ -96,13 +96,22 @@ type_combine(const typetree_t *a, const typetree_t *b)
 const typetree_t *
 type_deref(const typetree_t *t)
 {
-    if (t->type != POINTER && t->type != ARRAY) {
+    const typetree_t *type;
+
+    if (t->type == POINTER) {
+        type = t->next;
+        /*if (type->type == ARRAY) {
+            typetree_t *ptr = type_init(POINTER);
+            ptr->next = type->next;
+            type = ptr;
+        }*/
+    } else {
         char *str = typetostr(t);
         error("Cannot dereference non-pointer type `%s`.", str);
         free(str);
-        return NULL;
+        type = NULL;
     }
-    return t->next;
+    return type;
 }
 
 /* Complete type p by applying q.

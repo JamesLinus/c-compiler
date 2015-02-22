@@ -109,12 +109,22 @@ load(FILE *stream, var_t var, reg_t dest)
             }
             break;
         case DIRECT:
-            if (var.type->type == ARRAY && var.symbol->depth)
-                fprintf(stream, "\tleaq\t%d(%%rbp), %%%s\t# load %s\n", var.symbol->stack_offset, reg(dest, w), var.symbol->name);
-            else
+            if (var.symbol->type->type == ARRAY && !var.offset) {
+                if (var.symbol->depth) {
+                    fprintf(stream, "\tleaq\t%d(%%rbp), %%%s\t# load array %s\n", var.symbol->stack_offset, reg(dest, w), var.symbol->name);
+                } else {
+                    fprintf(stream, "\tleaq\t%s(%%rip), %%%s\t# load static array %s\n", var.symbol->name, reg(dest, w), var.symbol->name);
+                }
+            } else {
                 fprintf(stream, "\t%s\t%s, %%%s\t# load %s\n", mov, refer(var), reg(dest, w), var.symbol->name);
+            }
             break;
         case OFFSET:
+            /*if (var.type->type == ARRAY) {
+                fprintf(stream, "\tleaq\t%d(%%rbp), %%%s\t# load array *%s\n", var.symbol->stack_offset + var.offset, reg(dest, 8), var.symbol->name);
+            }
+            else
+            {*/
             fprintf(stream, "\tmovq\t%d(%%rbp), %%r10\t# load *%s\n", var.symbol->stack_offset, var.symbol->name);
             if (var.type->type == ARRAY) {
                 if (var.offset)

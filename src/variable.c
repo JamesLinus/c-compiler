@@ -10,6 +10,11 @@ var_direct(const symbol_t *symbol)
     var.symbol = symbol;
     var.type = symbol->type;
     var.lvalue = symbol->name[0] != '.';
+    if (symbol->type->type == ARRAY) {
+        typetree_t *type = type_init(POINTER);
+        type->next = symbol->type->next;
+        var.type = type;
+    }
     return var;
 }
 

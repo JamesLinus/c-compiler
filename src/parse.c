@@ -153,7 +153,9 @@ initializer(block_t *block, var_t target)
 
     if (peek() == '{') {
         assert(target.kind == DIRECT);
-        type = target.type;
+        assert(target.offset == 0);
+        type = (target.symbol->type->type == ARRAY) ?
+            target.symbol->type : target.type;
         target.lvalue = 1;
         consume('{');
         if (type->type == OBJECT) {
@@ -948,6 +950,7 @@ unary_expression(block_t *block)
                     if (peek() != ')') {
                         type = declarator(type, NULL);
                     }
+                    expr.kind = -1;
                     expr.type = type;
                 }
                 consume(')');
@@ -959,6 +962,9 @@ unary_expression(block_t *block)
             }
             if (!expr.type->size) {
                 error("Cannot apply 'sizeof' to incomplete type.");
+            }
+            if (expr.kind == DIRECT && expr.symbol->type->type == ARRAY && !expr.offset) {
+                expr.type = expr.symbol->type;
             }
             expr = var_long(expr.type->size);
             break;
@@ -997,11 +1003,22 @@ postfix_expression(block_t *block)
 
         switch (peek()) {
             case '[':
-                /* Evaluate a[b] = *(a + b). */
+                /* Evaluate root[expr] = *(root + expr).
+                 * One expression must be of type pointer to T, while the other
+                 * must be integer type. Assume that root is the pointer.
+                 */
                 while (peek() == '[') {
                     consume('[');
                     expr = expression(block);
-                    expr = eval_expr(block, IR_OP_MUL, expr, var_long(root.type->next->size));
+                    if (root.type->type == POINTER && expr.type->type == INTEGER) {
+                        expr = eval_expr(block, IR_OP_MUL, expr, var_long(root.type->next->size));
+                    } else if (root.type->type == INTEGER && expr.type->type == POINTER) {
+                        root = eval_expr(block, IR_OP_MUL, root, var_long(expr.type->next->size));
+                    } else {
+                        error("Array indexing requires pointer and integer operands.");
+                        error("Type was %s.", typetostr(root.type));
+                        exit(1);
+                    }
                     expr = eval_expr(block, IR_OP_ADD, root, expr);
                     root = eval_deref(block, expr);
                     consume(']');
